@@ -1,0 +1,2 @@
+data: {"type": "error", "content": "(sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.ForeignKeyViolationError'>: insert or update on table \"conversations\" violates foreign key constraint \"conversations_user_id_fkey\"\nDETAIL:  Key (user_id)=(1) is not present in table \"users\".\n[SQL: INSERT INTO conversations (user_id, title) VALUES ($1::INTEGER, $2::VARCHAR) RETURNING conversations.id, conversations.created_at]\n[parameters: (1, None)]\n(Background on this error at: https://sqlalche.me/e/20/gkpj)"}
+
