@@ -45,6 +45,40 @@ async def client(db_session):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"Authorization": f"Bearer {token}"}) as ac:
         yield ac
 
+
+@pytest_asyncio.fixture(scope="function")
+async def analyst_client(db_session):
+    """返回带 Analyst Token 的 AsyncClient。"""
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    from app.auth import create_access_token
+    token = create_access_token(user_id=888, username="analyst_tester", role="analyst")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"Authorization": f"Bearer {token}"}) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture(scope="function")
+async def viewer_client(db_session):
+    """返回带 Viewer Token 的 AsyncClient。"""
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    from app.auth import create_access_token
+    token = create_access_token(user_id=777, username="viewer_tester", role="viewer")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"Authorization": f"Bearer {token}"}) as ac:
+        yield ac
+
 @pytest_asyncio.fixture(scope="function")
 async def unauth_client(db_session):
     """返回无 Token 的 AsyncClient。"""
