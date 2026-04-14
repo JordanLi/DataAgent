@@ -136,6 +136,10 @@ class AgentOrchestrator:
 
             raw_sql = extract_sql(full_response)
             if not raw_sql:
+                from app.core.query.generator import force_extract_sql
+                raw_sql = force_extract_sql(full_response)
+
+            if not raw_sql:
                 raise ValueError("LLM 未返回有效 SQL，请重新提问")
 
             yield _event({"type": "sql", "content": raw_sql})

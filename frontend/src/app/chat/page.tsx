@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { useChatStore } from '@/store/chatStore'
 import { Database } from 'lucide-react'
@@ -9,10 +10,17 @@ import { DataSource } from '@/lib/types'
 
 export default function ChatPage() {
   const { setDatasources, setSelectedDatasourceId, datasources, selectedDatasourceId } = useChatStore()
+  const router = useRouter()
 
   // For MVP, we mock the datasources if API is not fully ready.
   // In real app, this fetches from /api/datasources
   useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
     const fetchDatasources = async () => {
       try {
         // const res = await api.get<{items: DataSource[]}>('/datasources')

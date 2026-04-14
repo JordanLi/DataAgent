@@ -34,6 +34,19 @@ SELECT ...
 
 不要输出任何解释性文字。
 
+## 示例
+问题: 上个月订单量最多的三个商品
+解答:
+```sql
+SELECT p.name, SUM(oi.quantity) AS total_quantity 
+FROM order_items oi
+JOIN products p ON oi.product_id = p.id
+WHERE oi.created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 1 MONTH)
+GROUP BY p.id, p.name
+ORDER BY total_quantity DESC
+LIMIT 3;
+```
+
 ## Schema 信息
 {schema_context}
 """
@@ -66,6 +79,20 @@ def extract_sql(text: str) -> str | None:
         return stripped
     return None
 
+def force_extract_sql(text: str) -> str:
+    """降级：如果没有代码块标记，提取可能的SQL。"""
+    # 简单过滤，把所有的文字可能包进来的剥离掉
+    import re
+    # 寻找 select 开头的语句，直到结尾
+    # 允许匹配多行
+    m = re.search(r"(SELECT\s+.*)", text, re.IGNORECASE | re.DOTALL)
+    if m:
+        sql = m.group(1).strip()
+        # 清理可能结尾带的markdown符号
+        sql = re.sub(r"```[a-z]*$", "", sql, flags=re.IGNORECASE).strip()
+        sql = re.sub(r"```$", "", sql).strip()
+        return sql
+    return ""
 
 class SQLGenerator:
     """将自然语言问题 + Schema 上下文 → SQL。"""
@@ -134,7 +161,7 @@ class SQLGenerator:
             messages.extend(history)
         messages.append({"role": "user", "content": question})
 
-        async for chunk in self._llm.chat_stream(messages, temperature=0):
+        async for chunk in self._llm.chat_stream(messages, temperature=0.1):
             yield chunk
 
     # ------------------------------------------------------------------
