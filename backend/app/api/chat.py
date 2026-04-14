@@ -14,9 +14,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from app.auth import CurrentUser, get_current_user
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
 
 from app.core.agent import AgentOrchestrator
 from app.core.conversation.manager import ConversationManager
@@ -43,7 +44,6 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000, description="自然语言问题")
     datasource_id: int = Field(..., description="目标数据源 ID")
     conversation_id: int | None = Field(None, description="已有会话 ID，None 表示新建")
-    user_id: int = Field(1, description="当前用户 ID（Step 11 接入 JWT 后自动注入）")
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,11 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat")
-async def chat(payload: ChatRequest, db: DbDep):
+async def chat(
+    payload: ChatRequest,
+    db: DbDep,
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """NL-to-SQL 查询，以 Server-Sent Events 流式返回各阶段结果。
 
     事件类型:
@@ -73,7 +77,7 @@ async def chat(payload: ChatRequest, db: DbDep):
                 question=payload.question,
                 datasource_id=payload.datasource_id,
                 conversation_id=payload.conversation_id,
-                user_id=payload.user_id,
+                user_id=current_user.user_id,
             ):
                 yield event
         except Exception as exc:
@@ -97,17 +101,24 @@ async def chat(payload: ChatRequest, db: DbDep):
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
-async def list_conversations(user_id: int = 1, db: DbDep = None):
+async def list_conversations(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: DbDep = None,
+):
     """返回指定用户的所有会话（按创建时间倒序）。"""
     mgr = ConversationManager(db)
-    return await mgr.list_conversations(user_id)
+    return await mgr.list_conversations(current_user.user_id)
 
 
 @router.post("/conversations", response_model=ConversationOut, status_code=201)
-async def create_conversation(payload: ConversationCreate, user_id: int = 1, db: DbDep = None):
+async def create_conversation(
+    payload: ConversationCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: DbDep = None,
+):
     """手动创建一个空会话。"""
     mgr = ConversationManager(db)
-    return await mgr.create_conversation(user_id=user_id, title=payload.title)
+    return await mgr.create_conversation(user_id=current_user.user_id, title=payload.title)
 
 
 @router.get("/conversations/{conv_id}", response_model=ConversationWithMessages)

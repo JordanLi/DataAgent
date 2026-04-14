@@ -2,10 +2,11 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.auth import get_current_user, require_admin, require_analyst_or_admin
 
 
 @asynccontextmanager
@@ -42,10 +43,10 @@ def create_app() -> FastAPI:
     from app.api.admin import router as admin_router
 
     app.include_router(auth_router,       prefix="/api/auth",       tags=["auth"])
-    app.include_router(chat_router,       prefix="/api",            tags=["chat"])
-    app.include_router(datasource_router, prefix="/api/datasources",tags=["datasources"])
-    app.include_router(semantic_router,   prefix="/api/semantic",   tags=["semantic"])
-    app.include_router(admin_router,      prefix="/api/admin",      tags=["admin"])
+    app.include_router(chat_router,       prefix="/api",            tags=["chat"], dependencies=[Depends(get_current_user)])
+    app.include_router(datasource_router, prefix="/api/datasources",tags=["datasources"], dependencies=[Depends(require_analyst_or_admin)])
+    app.include_router(semantic_router,   prefix="/api/semantic",   tags=["semantic"], dependencies=[Depends(require_analyst_or_admin)])
+    app.include_router(admin_router,      prefix="/api/admin",      tags=["admin"], dependencies=[Depends(require_admin)])
 
     @app.get("/health", tags=["health"])
     async def health():

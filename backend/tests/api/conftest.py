@@ -31,7 +31,23 @@ async def db_session():
 
 @pytest_asyncio.fixture(scope="function")
 async def client(db_session):
-    """返回绑定测试 DB session 的 AsyncClient。"""
+    """返回绑定测试 DB session 的 AsyncClient（带 Admin Token）。"""
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    from app.auth import create_access_token
+    token = create_access_token(user_id=999, username="admin_tester", role="admin")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"Authorization": f"Bearer {token}"}) as ac:
+        yield ac
+
+@pytest_asyncio.fixture(scope="function")
+async def unauth_client(db_session):
+    """返回无 Token 的 AsyncClient。"""
     app = create_app()
 
     async def override_get_db():

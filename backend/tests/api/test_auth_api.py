@@ -92,12 +92,12 @@ async def test_me_returns_current_user(client):
     assert resp.json()["username"] == "frank"
 
 
-async def test_me_without_token_returns_401(client):
-    resp = await client.get("/api/auth/me")
+async def test_me_without_token_returns_401(unauth_client):
+    resp = await unauth_client.get("/api/auth/me")
     assert resp.status_code == 401
 
 
-async def test_me_with_invalid_token_returns_401(client):
-    resp = await client.get("/api/auth/me",
+async def test_me_with_invalid_token_returns_401(unauth_client):
+    resp = await unauth_client.get("/api/auth/me",
                             headers={"Authorization": "Bearer invalid.token.here"})
     assert resp.status_code == 401

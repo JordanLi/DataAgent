@@ -21,9 +21,11 @@ from app.auth import (
     get_current_user,
     hash_password,
     verify_password,
+    require_admin,
 )
 from app.models.database import get_db
 from app.models.user import User
+from app.models.audit import AuditLog
 from app.schemas.user import LoginRequest, TokenOut, UserCreate, UserOut
 
 logger = logging.getLogger(__name__)
@@ -60,6 +62,15 @@ async def login(payload: LoginRequest, db: DbDep):
         role=user.role.value,
     )
     logger.info("User '%s' logged in successfully", user.username)
+
+    audit = AuditLog(
+        user_id=user.id,
+        action="login",
+        datasource_id=None,
+    )
+    db.add(audit)
+    await db.commit()
+
     return TokenOut(access_token=token)
 
 
@@ -68,10 +79,14 @@ async def login(payload: LoginRequest, db: DbDep):
 # ---------------------------------------------------------------------------
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, db: DbDep):
+async def register(
+    payload: UserCreate,
+    db: DbDep,
+    current_admin: Annotated[CurrentUser, Depends(require_admin)],
+):
     """注册新用户。
 
-    注意：Step 11 将为此接口添加 admin 权限校验；当前开放注册用于开发调试。
+    注意：Step 11 为此接口添加了 admin 权限校验。
     """
     existing = await db.execute(select(User).where(User.username == payload.username))
     if existing.scalar_one_or_none() is not None:

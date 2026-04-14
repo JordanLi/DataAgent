@@ -108,6 +108,13 @@ def require_admin(current: Annotated[CurrentUser, Depends(get_current_user)]) ->
     return current
 
 
+def require_analyst_or_admin(current: Annotated[CurrentUser, Depends(get_current_user)]) -> CurrentUser:
+    """要求分析师或管理员角色。"""
+    if current.role not in ("admin", "analyst"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要分析师或管理员权限")
+    return current
+
+
 async def get_current_user_from_db(
     current: Annotated[CurrentUser, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -9,7 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import CurrentUser, get_current_user
 from app.connectors import SchemaDiscovery, build_connector, encrypt_password
+from app.models.audit import AuditLog
 from app.models.database import get_db
 from app.models.datasource import DataSource, TableMetadata
 from app.schemas.datasource import (
@@ -128,7 +130,11 @@ async def test_connection(ds_id: int, db: DbDep):
 # ---------------------------------------------------------------------------
 
 @router.post("/{ds_id}/discover", response_model=list[TableMetadataOut])
-async def trigger_discover(ds_id: int, db: DbDep):
+async def trigger_discover(
+    ds_id: int,
+    db: DbDep,
+    current_user: CurrentUser = Depends(get_current_user),
+):
     """Trigger a full schema discovery and persist the results."""
     ds = await _get_datasource_or_404(db, ds_id)
     connector = build_connector(ds)
@@ -140,6 +146,16 @@ async def trigger_discover(ds_id: int, db: DbDep):
         result = await db.execute(
             select(TableMetadata).where(TableMetadata.datasource_id == ds_id)
         )
+        
+        # 写入审计日志
+        audit = AuditLog(
+            user_id=current_user.user_id,
+            action="schema_discover",
+            datasource_id=ds_id,
+        )
+        db.add(audit)
+        await db.commit()
+
         return result.scalars().all()
     except Exception as exc:
         logger.error("Schema discovery failed for datasource=%d: %s", ds_id, exc)

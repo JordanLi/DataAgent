@@ -7,6 +7,7 @@ from app.auth.jwt_handler import (
     get_current_user_from_db,
     hash_password,
     require_admin,
+    require_analyst_or_admin,
     verify_password,
     CurrentUser,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "get_current_user_from_db",
     "hash_password",
     "require_admin",
+    "require_analyst_or_admin",
     "verify_password",
     "CurrentUser",
 ]
