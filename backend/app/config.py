@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import List, Optional
-
+import os
+import re
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +45,22 @@ class Settings(BaseSettings):
     query_timeout_seconds: int = 30
     query_max_rows: int = 10000
     default_sql_limit: int = 100
+
+    @field_validator("llm_api_key", mode="after")
+    @classmethod
+    def expand_env_vars(cls, v: str) -> str:
+        """Expand environment variables like ${VAR} if present."""
+        if v and "${" in v:
+            # First try os.path.expandvars which handles $VAR and ${VAR}
+            expanded = os.path.expandvars(v)
+            if expanded != v:
+                return expanded
+            # If expandvars didn't work (e.g. variable not in os.environ), let's parse manually
+            match = re.search(r"\$\{([^}]+)\}", v)
+            if match:
+                env_name = match.group(1)
+                return os.environ.get(env_name, "")
+        return v
 
     @property
     def cors_origin_list(self) -> List[str]:

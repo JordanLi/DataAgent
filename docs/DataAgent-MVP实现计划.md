@@ -34,10 +34,10 @@ todos:
     status: completed
   - id: step11-auth
     content: "Step 11: 实现权限与审计（JWT + RBAC + AuditLog）"
-    status: pending
+    status: completed
   - id: step12-docker
     content: "Step 12: Docker化 + README文档"
-    status: pending
+    status: completed
 isProject: false
 ---
 
