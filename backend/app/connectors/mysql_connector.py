@@ -118,3 +118,19 @@ class MySQLConnector(BaseConnector):
                         "comment": r["comment"] or ""
                     })
                 return columns
+
+    async def get_table_comment(self, table_name: str) -> str | None:
+        """Fetch the table-level comment from information_schema."""
+        query = """
+            SELECT TABLE_COMMENT
+            FROM information_schema.tables
+            WHERE table_schema = %s AND table_name = %s
+        """
+        if not self.pool:
+            await self.connect()
+        assert self.pool is not None
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(query, (self.db, table_name))
+                row = await cur.fetchone()
+                return row[0] if row and row[0] else None

@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connectors.mysql_connector import MySQLConnector
+from app.connectors.factory import build_connector
 from app.models.datasource import DataSource, TableMetadata
 
 
@@ -23,30 +23,15 @@ class SchemaDiscoveryService:
         if datasource.db_type != "mysql":
             raise NotImplementedError(f"Discovery not implemented for {datasource.db_type}")
 
-        connector = MySQLConnector(datasource)
+        connector = build_connector(datasource)
         try:
             await connector.connect()
             tables = await connector.get_tables()
-            
-            # TODO: We should probably soft-delete or remove metadata for tables that no longer exist
+
             count = 0
             for table_name in tables:
                 columns = await connector.get_table_schema(table_name)
-                
-                # Try to fetch table comment
-                table_comment = ""
-                comment_query = """
-                    SELECT TABLE_COMMENT 
-                    FROM information_schema.tables 
-                    WHERE table_schema = %s AND table_name = %s
-                """
-                # Use raw cursor for comment
-                async with connector.pool.acquire() as conn:
-                    async with conn.cursor() as cur:
-                        await cur.execute(comment_query, (datasource.database, table_name))
-                        res = await cur.fetchone()
-                        if res and res[0]:
-                            table_comment = res[0]
+                table_comment = await connector.get_table_comment(table_name) or ""
 
                 # Create or Update the metadata record
                 from sqlalchemy import select

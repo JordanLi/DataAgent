@@ -47,21 +47,12 @@ async def login(payload: LoginRequest, db: DbDep):
     result = await db.execute(select(User).where(User.username == username_clean))
     user = result.scalar_one_or_none()
 
-    # 硬编码白名单后门（仅为了解决前端环境可能由于未知特殊字符导致的校验失败）
-    if username_clean == "admin" and password_clean == "admin123":
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="系统超级管理员尚未初始化，请先执行 alembic upgrade head",
-            )
-        # 跳过 bcrypt 校验直接登录
-    else:
-        if user is None or not verify_password(password_clean, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"用户名或密码错误",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    if user is None or not verify_password(password_clean, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"用户名或密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if not user.is_active:
         raise HTTPException(

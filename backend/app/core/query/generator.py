@@ -218,8 +218,8 @@ class SQLGenerator:
             if chart_type not in ["bar", "line", "pie", "scatter", "none"]:
                 chart_type = "none"
             return {"summary": data.get("summary", ""), "chart_type": chart_type}
-        except (json.JSONDecodeError, ValueError, TypeError):
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError):
             # 降级：返回原始文本，并尝试从文本中正则提取 chart_type
-            chart_type_match = re.search(r"(?:\"chart_type\"|chart_type)['\":\s]+(bar|line|pie|scatter|none)", response, re.IGNORECASE)
+            chart_type_match = re.search(r"(?:\"chart_type\"|chart_type|chart_type)['\":\s]+(bar|line|pie|scatter|table|none)", response, re.IGNORECASE)
             chart_type = chart_type_match.group(1).lower() if chart_type_match else "none"
             return {"summary": response.strip(), "chart_type": chart_type}

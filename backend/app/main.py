@@ -1,17 +1,43 @@
 """FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
+import os
+import logging
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from app.config import get_settings
-from app.auth import get_current_user, require_admin, require_analyst_or_admin
+from app.auth import get_current_user, require_admin, require_analyst_or_admin, hash_password
+from app.models.database import AsyncSessionLocal
+from app.models.user import User, UserRole
 
+logger = logging.getLogger(__name__)
+
+async def _init_admin_user() -> None:
+    """初始化默认管理员账号"""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.username == "admin"))
+        if result.scalar_one_or_none() is None:
+            logger.info("Initializing default admin user...")
+            initial_password = os.getenv("ADMIN_INIT_PASSWORD", "admin123")
+            admin = User(
+                username="admin",
+                password_hash=hash_password(initial_password),
+                role=UserRole.admin
+            )
+            db.add(admin)
+            await db.commit()
+            logger.info("Default admin user created successfully.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
+    try:
+        await _init_admin_user()
+    except Exception as e:
+        logger.warning(f"Failed to initialize admin user: {e}")
     yield
     # shutdown
 

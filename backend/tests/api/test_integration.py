@@ -38,13 +38,22 @@ async def e2e_client(db_session):
         yield ac
 
 
-async def test_full_pipeline(e2e_client):
+async def test_full_pipeline(e2e_client, test_users):
+    # First, login with the default admin created by test fixture
+    admin_login_resp = await e2e_client.post("/api/auth/login", json={
+        "username": "admin_user",
+        "password": "adminpass"
+    })
+    assert admin_login_resp.status_code == 200
+    admin_token = admin_login_resp.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
     # ── 1. Auth: Register & Login (Step 8/11) ────────────────────────────────
     await e2e_client.post("/api/auth/register", json={
         "username": "e2e_user",
         "password": "password123",
         "role": "admin"
-    })
+    }, headers=admin_headers)
     login_resp = await e2e_client.post("/api/auth/login", json={
         "username": "e2e_user",
         "password": "password123"
@@ -97,13 +106,10 @@ async def test_full_pipeline(e2e_client):
     mock_llm.chat = fake_chat
 
     mock_connector = AsyncMock()
-    mock_connector.execute_query.return_value = {
-        "columns": ["id", "amount"],
-        "rows": [[1, 100]],
-        "row_count": 1,
-        "truncated": False,
-        "execution_time_ms": 15
-    }
+    mock_connector.execute_query.return_value = (
+        ["id", "amount"],
+        [{"id": 1, "amount": 100}],
+    )
 
     # Patch factory functions
     with patch("app.core.agent.create_llm", return_value=mock_llm), \
@@ -147,8 +153,8 @@ async def test_full_pipeline(e2e_client):
     audit_resp = await e2e_client.get("/api/admin/audit-logs", headers=headers)
     assert audit_resp.status_code == 200
     logs = audit_resp.json()
-    assert len(logs) == 1
-    assert logs[0]["action"] == "query"
-    assert logs[0]["datasource_id"] == ds_id
-    assert logs[0]["row_count"] == 1
-    assert "SELECT * FROM orders" in logs[0]["sql_executed"]
+    query_logs = [l for l in logs if l["action"] == "query"]
+    assert len(query_logs) == 1
+    assert query_logs[0]["datasource_id"] == ds_id
+    assert query_logs[0]["row_count"] == 1
+    assert "SELECT * FROM orders" in query_logs[0]["sql_executed"]

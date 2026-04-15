@@ -6,12 +6,14 @@ from app.schemas.semantic import BusinessTermCreate, FieldAliasCreate
 from app.schemas.conversation import ConversationCreate
 
 @pytest.mark.asyncio
+@patch("app.connectors.schema_discovery.build_connector")
 @patch("app.api.datasource.build_connector")
 @patch("app.core.agent.create_llm")
 @patch("app.core.agent.build_connector")
 async def test_end_to_end_flow(
     mock_build_connector_chat,
     mock_create_llm,
+    mock_build_connector_test,
     mock_build_connector_ds,
     async_client
 ):
@@ -38,18 +40,16 @@ async def test_end_to_end_flow(
         {"name": "status", "type": "int", "nullable": True, "primary_key": False, "comment": "Order status"},
         {"name": "amount", "type": "decimal", "nullable": True, "primary_key": False, "comment": "Amount in USD"}
     ]
-    # In SQLite for testing, mock execute to return table comment empty
-    mock_connector_ds.pool.acquire.return_value.__aenter__.return_value.cursor.return_value.__aenter__.return_value.fetchone.return_value = ["Order records"]
+    mock_connector_ds.get_table_comment.return_value = "Order records"
     mock_build_connector_ds.return_value = mock_connector_ds
+    mock_build_connector_test.return_value = mock_connector_ds
 
     # 2. Mock the Chat Query execution connector behavior
     mock_connector_chat = AsyncMock()
-    mock_connector_chat.execute_query.return_value = {
-        "columns": ["status", "total_amount"],
-        "rows": [[1, 500.0], [2, 1200.0]],
-        "row_count": 2,
-        "execution_time_ms": 15
-    }
+    mock_connector_chat.execute_query.return_value = (
+        ["status", "total_amount"],
+        [{"status": 1, "total_amount": 500.0}, {"status": 2, "total_amount": 1200.0}],
+    )
     mock_build_connector_chat.return_value = mock_connector_chat
 
     # 3. Mock LLM layer

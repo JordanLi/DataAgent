@@ -46,3 +46,7 @@ class BaseConnector(ABC):
         :return: List of dicts describing columns (name, type, etc.)
         """
         pass
+
+    async def get_table_comment(self, table_name: str) -> str | None:
+        """Get the comment for a specific table. Returns None by default."""
+        return None

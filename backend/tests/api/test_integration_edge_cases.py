@@ -36,13 +36,10 @@ async def e2e_client(db_session):
 
 
 @pytest.fixture
-async def auth_headers(e2e_client):
-    """Register and login, return auth headers."""
-    await e2e_client.post("/api/auth/register", json={
-        "username": "edge_user", "password": "password123", "role": "admin"
-    })
+async def auth_headers(e2e_client, test_users):
+    """Login with the seeded admin user, return auth headers."""
     resp = await e2e_client.post("/api/auth/login", json={
-        "username": "edge_user", "password": "password123"
+        "username": "admin_user", "password": "adminpass"
     })
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -116,10 +113,10 @@ async def test_multi_turn_conversation(e2e_client, auth_headers, setup_ds):
     mock_llm.chat = fake_chat_1
 
     mock_connector = AsyncMock()
-    mock_connector.execute_query.return_value = {
-        "columns": ["count"], "rows": [[10]], "row_count": 1,
-        "truncated": False, "execution_time_ms": 10
-    }
+    mock_connector.execute_query.return_value = (
+        ["count"],
+        [{"count": 10}],
+    )
 
     with patch("app.core.agent.create_llm", return_value=mock_llm), \
          patch("app.core.agent.build_connector", return_value=mock_connector):

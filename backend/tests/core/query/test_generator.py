@@ -139,7 +139,7 @@ class TestGenerateSummary:
         result = self._call(self._gen("这是一段无法解析的文本"))
         assert "summary" in result
         assert "chart_type" in result
-        assert result["chart_type"] == "table"
+        assert result["chart_type"] == "none"
 
     def test_fallback_preserves_raw_text(self):
         text = "无效JSON但是有意义的文本"

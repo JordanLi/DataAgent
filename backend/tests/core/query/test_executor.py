@@ -11,7 +11,7 @@ import asyncio
 import datetime
 import decimal
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Stub ORM / connector modules before any app import (Python 3.9 compat)
 for _m in (
@@ -39,14 +39,18 @@ def _make_connector(columns, rows, exec_ms=42):
     """Return a connector stub whose execute_query returns canned data."""
     connector = MagicMock()
 
-    async def execute_query(sql, timeout, max_rows):
-        limited = rows[:max_rows]
-        return {
-            "columns": columns,
-            "rows": limited,
-            "row_count": len(limited),
-            "execution_time_ms": exec_ms,
-        }
+    async def execute_query(sql):
+        # We need to simulate a small delay if execution_time_ms is > 0 so that `end_time - start_time` matches expectations
+        if exec_ms > 0:
+            # We can't use asyncio.sleep because it would be real delay.
+            # But the executor uses `asyncio.get_event_loop().time()` to measure execution time.
+            # The test actually just wants the execution_time_ms.
+            # However, since the executor uses the loop time now, we can't easily control it
+            # without mocking `asyncio.get_event_loop().time()`.
+            # A simpler way is to just mock `asyncio.get_event_loop().time` in the test.
+            pass
+        dict_rows = [dict(zip(columns, r)) for r in rows]
+        return columns, dict_rows
 
     connector.execute_query = execute_query
     connector.close = MagicMock(return_value=_coro(None))
@@ -130,8 +134,10 @@ class TestExecute:
 
     def test_execution_time_preserved(self):
         c = _make_connector(["x"], [[1]], exec_ms=123)
-        result = run(_exec(c).execute("SELECT x FROM t"))
-        assert result["execution_time_ms"] == 123
+        with patch("app.core.query.executor.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.time.side_effect = [0.0, 0.123]
+            result = run(_exec(c).execute("SELECT x FROM t"))
+            assert result["execution_time_ms"] == 123
 
     def test_not_truncated_when_under_limit(self):
         c = _make_connector(["x"], [[i] for i in range(10)])

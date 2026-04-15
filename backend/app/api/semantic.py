@@ -363,10 +363,22 @@ async def preview_prompt_context(ds_id: int, db: DbDep):
     try:
         loader = SemanticLoader(db)
         ctx = await loader.load_full_context(ds_id)
+        schema_context = SemanticEngine.build_schema_prompt(ctx)
+        # Build semantic context from business terms and relations
+        sem_lines = []
+        if ctx.get("business_terms"):
+            sem_lines.append("业务术语:")
+            for t in ctx["business_terms"]:
+                sem_lines.append(f"  {t['term']}: {t.get('sql', '')} | {t.get('definition', '')}")
+        if ctx.get("relations"):
+            sem_lines.append("表关联:")
+            for r in ctx["relations"]:
+                sem_lines.append(f"  {r}")
+        semantic_context = "\n".join(sem_lines)
         return {
-            "schema_context": SemanticEngine.build_schema_prompt(ctx),
-            "semantic_context": "",
-            "full_context": SemanticEngine.build_schema_prompt(ctx),
+            "schema_context": schema_context,
+            "semantic_context": semantic_context,
+            "full_context": f"{schema_context}\n{semantic_context}" if semantic_context else schema_context,
             "table_count": len(ctx["schema"]),
             "term_count": len(ctx["business_terms"]),
             "relation_count": len(ctx["relations"]),
